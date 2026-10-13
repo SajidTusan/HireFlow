@@ -69,6 +69,7 @@ class Invitation(models.Model):
     candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE, related_name="invitations")
     email_status = models.CharField(max_length=20, default="pending")
     sms_status = models.CharField(max_length=20, default="pending")
+    whatsapp_status = models.CharField(max_length=20, default="not configured")
     sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:

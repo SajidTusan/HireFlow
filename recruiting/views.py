@@ -1,11 +1,12 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from .models import ApplicationScore, Candidate, Job
-from .services import extract_profile, extract_text, interview_questions, invite_candidate, refresh_candidate_profile, score_candidate
+from .services import candidate_summary, extract_profile, extract_text, interview_questions, invite_candidate, refresh_candidate_profile, score_candidate
 
 @login_required
 def dashboard(request):
@@ -36,6 +37,8 @@ def job_detail(request, job_id):
         messages.success(request, "Candidate scores refreshed against this role.")
         return redirect("job_detail", job_id=job.id)
     scores = job.scores.select_related("candidate").order_by("-score", "candidate__name")
+    for item in scores:
+        item.ai_summary = candidate_summary(job, item)
     return render(request, "recruiting/job_detail.html", {"job": job, "scores": scores, "applicant_count": scores.count(), "shortlisted_count": scores.filter(shortlist_rank__isnull=False).count(), "invited_count": job.invitations.count()})
 
 @login_required
@@ -59,10 +62,15 @@ def invite_shortlisted(request, job_id):
     job = get_object_or_404(Job, pk=job_id)
     if request.method == "POST":
         scores = job.scores.filter(shortlist_rank__isnull=False).select_related("candidate")
-        sent = 0
-        for score in scores:
-            invite_candidate(job, score.candidate); sent += 1
-        messages.success(request, f"Invitation workflow processed for {sent} shortlisted candidates. Check delivery status below.")
+        if not scores.exists():
+            messages.warning(request, "Shortlist is empty. Rank candidates before sending invitations.")
+        elif settings.CELERY_BROKER_URL:
+            from .tasks import send_shortlist_invitations
+            send_shortlist_invitations.delay(job.id)
+            messages.success(request, "Invitation batch queued. Delivery statuses will update as the worker processes candidates.")
+        else:
+            sent = sum(1 for score in scores if invite_candidate(job, score.candidate))
+            messages.success(request, f"Invitation workflow processed for {sent} shortlisted candidates. Check delivery status below.")
     return redirect("job_detail", job_id=job.id)
 
 @login_required
@@ -138,4 +146,4 @@ def settings_page(request):
     tess_path = settings.TESSERACT_CMD
     tess_ready = Path(tess_path).is_file() if tess_path else bool(shutil.which("tesseract"))
     ocr_ready = tess_ready and all(importlib.util.find_spec(module) for module in ("fitz", "PIL", "pytesseract"))
-    return render(request, "recruiting/settings.html", {"email_ready": bool(settings.EMAIL_HOST), "sms_ready": bool(settings.TWILIO_ACCOUNT_SID), "ocr_ready": ocr_ready})
+    return render(request, "recruiting/settings.html", {"email_ready": bool(settings.EMAIL_HOST), "sms_ready": bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_FROM_NUMBER), "whatsapp_ready": bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_WHATSAPP_FROM), "ocr_ready": ocr_ready})
