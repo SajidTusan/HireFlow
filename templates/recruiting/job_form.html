@@ -1,0 +1,18 @@
+{% extends 'recruiting/base.html' %}
+{% block title %}Create role{% endblock %}
+{% block crumb %}<a href="{% url 'jobs' %}">Roles</a> <span>/</span> New role{% endblock %}
+{% block content %}
+<div class="welcome-row"><div><div class="eyebrow">LET'S FIND YOUR NEXT GREAT PERSON</div><h1>Create a role</h1><p class="subheading">Tell us what this person will bring to the team.</p></div></div>
+<form method="post" class="panel form-panel">{% csrf_token %}
+  <div class="form-section"><div class="section-number">01</div><div class="form-section-body"><h2>Role basics</h2><p>Give candidates a sense of where they could make a difference.</p><div class="form-grid">
+    <label>Job title <span>*</span><input name="title" placeholder="e.g. Senior Product Designer" required></label><label>Department<input name="department" placeholder="e.g. Design & Experience"></label><label>Location<input name="location" placeholder="e.g. Dhaka · Hybrid"></label><label>Interview format<input name="interview_mode" value="Online · Google Meet" placeholder="Online or onsite"></label><label class="full-field">What you'll work on<textarea name="description" rows="3" placeholder="A short, inviting description of the role..."></textarea></label>
+  </div></div></div>
+  <div class="form-section"><div class="section-number">02</div><div class="form-section-body"><h2>Skills & experience</h2><p>We match resume evidence to each criterion and show how the score was built.</p><div class="form-grid">
+    <label class="full-field">Must-have skills <span>*</span><input name="required_skills" placeholder="Python, Django, PostgreSQL" required><small>Separate skills with commas.</small></label><label class="full-field">Nice-to-have skills<input name="nice_to_have" placeholder="AWS, Docker, React"><small>Preferred skills add to the match score.</small></label><label>Relevant experience <span class="optional">(years)</span><input name="experience_years" type="number" min="0" max="50" value="0"></label><label>Minimum education<input name="required_education" placeholder="e.g. Bachelor's degree"><small>Leave blank if it is not a requirement.</small></label>
+  </div></div></div>
+  <div class="form-section"><div class="section-number">03</div><div class="form-section-body"><h2>Proof of impact</h2><p>Optional evidence helps distinguish people who have applied their skills in practice.</p><div class="form-grid">
+    <label class="full-field">Project evidence<input name="project_keywords" placeholder="e.g. payment system, analytics dashboard"><small>Keywords to look for in the candidate's Projects section.</small></label><label class="full-field">Achievements<input name="achievement_keywords" placeholder="e.g. reduced costs, grew revenue, award"><small>Keywords to look for in achievements or awards.</small></label><label>Shortlist size<input name="shortlist_size" type="number" min="1" max="500" value="20"><small>How many people should be shortlisted?</small></label>
+  </div></div></div>
+  <div class="form-footer"><a class="button button-ghost" href="{% url 'jobs' %}">Cancel</a><button class="button button-primary" type="submit">Create role <span>→</span></button></div>
+</form>
+{% endblock %}
