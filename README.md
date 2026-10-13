@@ -6,6 +6,7 @@ HireFlow is a Django hiring workspace for resume intake, explainable role matchi
 
 - Create roles with required and preferred skills, experience signal, interview format, and shortlist size.
 - Upload multiple PDF, DOCX, or TXT resumes. The app extracts text and looks for email/phone contact details.
+- Export shortlist CSVs with the latest role and company, the two most recent education institutions and CGPAs, project names and GitHub links, LinkedIn URL, and latest achievements.
 - Match candidates to a role using an explainable skill phrase and experience baseline. Every match shows the skills found, missing skills, and scoring explanation.
 - Parse common CV sections into education, employment history, projects, achievements, certifications, and languages. Estimate experience from stated years and work date ranges.
 - Add optional education, project, and achievement criteria to a role. Candidate profiles show per-dimension scores and criteria that were not configured are marked as such.
@@ -14,7 +15,7 @@ HireFlow is a Django hiring workspace for resume intake, explainable role matchi
 - Process interview invitations for the shortlist. Email uses Django email; SMS can use Twilio. Delivery status is recorded for each channel.
 - Dashboard, role pipeline, candidate profiles, search and stage filters, Django admin, and responsive modern UI.
 
-The matching baseline is deliberately transparent and does not use age, gender, photos, or other protected traits. It combines exact skill phrase coverage, TF-IDF cosine similarity between the role and resume text, and optional evidence for experience, education, projects, and achievements. Active criteria are normalized into an overall score and shown separately in each candidate profile. Resume section extraction recognizes common headings (for example, “Education”, “Work Experience”, “Projects”, and “Achievements”); unusual headings may need manual review. Experience is an estimate from stated years or date ranges. Image-only/scanned resumes need OCR, and equivalent skills written differently may not match. Treat scores as a review aid; the recruiter should review each shortlist.
+The matching baseline is deliberately transparent and does not use age, gender, photos, or other protected traits. It combines exact skill phrase coverage, TF-IDF cosine similarity between role criteria and resume skills/work/projects, and optional evidence for experience, education, projects, and achievements. Active criteria are normalized into an overall score and shown separately in each candidate profile. Resume extraction recognizes common headings (for example, “Education”, “Work Experience”, “Projects”, and “Achievements”); unusual headings may need manual review. It identifies education institutions/degree/CGPA, role/company pairs, GitHub/LinkedIn URLs, project names, and recent achievements when those appear in readable text. Experience is an estimate from stated years or date ranges. Text-based PDFs work directly. Scanned/image-only PDFs use OCR if Tesseract is installed and `TESSERACT_CMD` is configured when needed; OCR processes at most 15 pages per resume. Equivalent skills written differently may not match. Treat scores as a review aid; the recruiter should review each shortlist.
 
 ## Run locally (Windows PowerShell)
 
@@ -38,6 +39,8 @@ python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/> and sign in with the administrator account. The demo dataset includes a role and fictional ranked candidates. The `.env` file is ignored by Git.
+
+For scanned PDFs, install Tesseract OCR on the computer and set `TESSERACT_CMD` in `.env` to the `tesseract.exe` path if it is not on `PATH`. Then install Python dependencies with `pip install -r requirements.txt` and restart the server. The Settings page shows whether OCR is ready.
 
 ## Email and SMS
 

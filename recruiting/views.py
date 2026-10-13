@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from .models import ApplicationScore, Candidate, Job
-from .services import extract_profile, extract_text, interview_questions, invite_candidate, score_candidate
+from .services import extract_profile, extract_text, interview_questions, invite_candidate, refresh_candidate_profile, score_candidate
 
 @login_required
 def dashboard(request):
@@ -73,9 +73,14 @@ def export_shortlist(request, job_id):
     response["Content-Disposition"] = f'attachment; filename="hireflow-{job.id}-shortlist.csv"'
     response.write("\ufeff")
     writer = csv.writer(response)
-    writer.writerow(["Rank", "Candidate", "Email", "Phone", "Overall", "Skills", "Experience", "Education", "Projects", "Achievements", "Role relevance", "Matched skills", "Missing skills"])
+    writer.writerow(["Rank", "Candidate", "Email", "Phone", "Overall", "Skills score", "Experience score", "Education score", "Projects score", "Achievements score", "Role relevance", "Previous role", "Previous company", "Education 1 institute", "Education 1 degree", "Education 1 CGPA", "Education 2 institute", "Education 2 degree", "Education 2 CGPA", "Project names", "Project GitHub links", "LinkedIn URL", "Latest achievements", "Matched skills", "Missing skills"])
     for item in job.scores.filter(shortlist_rank__isnull=False).select_related("candidate").order_by("shortlist_rank"):
-        writer.writerow([item.shortlist_rank, item.candidate.name, item.candidate.email, item.candidate.phone, item.score, item.skills_score, item.experience_score, item.education_score, item.projects_score, item.achievements_score, item.nlp_score, ", ".join(item.matched_skills), ", ".join(item.missing_skills)])
+        candidate = item.candidate
+        refresh_candidate_profile(candidate)
+        role = candidate.experience_records[0] if candidate.experience_records else {}
+        education_1 = candidate.education_records[0] if candidate.education_records else {}
+        education_2 = candidate.education_records[1] if len(candidate.education_records) > 1 else {}
+        writer.writerow([item.shortlist_rank, candidate.name, candidate.email, candidate.phone, item.score, item.skills_score, item.experience_score, item.education_score, item.projects_score, item.achievements_score, item.nlp_score, role.get("role", ""), role.get("company", ""), education_1.get("institution", ""), education_1.get("degree", ""), education_1.get("cgpa", ""), education_2.get("institution", ""), education_2.get("degree", ""), education_2.get("cgpa", ""), " | ".join(project.get("name", "") for project in candidate.project_records), " | ".join(f"{project.get('name', 'Project')}: {project.get('github_url', '')}" for project in candidate.project_records if project.get("github_url")), candidate.linkedin_url, " | ".join(entry.get("name", "") for entry in candidate.latest_achievements), ", ".join(item.matched_skills), ", ".join(item.missing_skills)])
     return response
 
 @login_required
@@ -107,7 +112,8 @@ def candidate_upload(request):
                 phone = next(iter(re.findall(r"(?:\+?\d[\d\s().-]{7,}\d)", text)), "")
                 name = next((line.strip() for line in text.splitlines() if line.strip()), f.name.rsplit(".", 1)[0])[:160]
                 profile = extract_profile(text)
-                candidate = Candidate.objects.create(name=name, email=email, phone=phone, resume=f, resume_text=text, skills_profile=profile["skills"], education_profile=profile["education"], experience_profile=profile["experience"], projects_profile=profile["projects"], achievements_profile=profile["achievements"], certifications_profile=profile["certifications"], languages_profile=profile["languages"], estimated_experience_years=profile["estimated_experience_years"])
+                candidate = Candidate.objects.create(name=name, email=email, phone=phone, resume=f, resume_text=text)
+                refresh_candidate_profile(candidate, profile)
                 if job: score_candidate(job, candidate)
                 added += 1
             messages.success(request, f"{added} resume(s) parsed and added." if added else "No readable resume was found. Try text-based PDF, DOCX or TXT files.")
@@ -117,6 +123,7 @@ def candidate_upload(request):
 @login_required
 def candidate_detail(request, candidate_id):
     candidate = get_object_or_404(Candidate, pk=candidate_id)
+    refresh_candidate_profile(candidate)
     scores = list(candidate.scores.select_related("job"))
     for score in scores:
         score.interview_questions = interview_questions(score.job, score)
@@ -124,5 +131,11 @@ def candidate_detail(request, candidate_id):
 
 @login_required
 def settings_page(request):
+    import importlib.util
+    import shutil
+    from pathlib import Path
     from django.conf import settings
-    return render(request, "recruiting/settings.html", {"email_ready": bool(settings.EMAIL_HOST), "sms_ready": bool(settings.TWILIO_ACCOUNT_SID)})
+    tess_path = settings.TESSERACT_CMD
+    tess_ready = Path(tess_path).is_file() if tess_path else bool(shutil.which("tesseract"))
+    ocr_ready = tess_ready and all(importlib.util.find_spec(module) for module in ("fitz", "PIL", "pytesseract"))
+    return render(request, "recruiting/settings.html", {"email_ready": bool(settings.EMAIL_HOST), "sms_ready": bool(settings.TWILIO_ACCOUNT_SID), "ocr_ready": ocr_ready})
